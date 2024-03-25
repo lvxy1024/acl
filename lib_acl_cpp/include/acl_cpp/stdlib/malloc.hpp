@@ -3,15 +3,31 @@
 
 #ifdef ACL_HOOK_NEW
 
+#ifdef ACL_CPP_DEBUG_MEM
+#undef ACL_CPP_DEBUG_MEM
+#endif
+
 # if defined(_WIN32) || defined(_WIN64)
-#  ifdef NDEBUG
-void* operator new(size_t n);
-void  operator delete(void *p);
-#  endif
+	#  ifdef NDEBUG
+		#include <new>
+		void* operator new(size_t n);
+		void  operator delete(void *p);
+	#  endif
 # else
-#include <new>
-void* operator new(size_t n)  throw (std::bad_alloc);
-void  operator delete(void *p) throw();
+	#include <new>
+
+	void* operator new(std::size_t);      // throw(std::bad_alloc)
+	void* operator new[](std::size_t);    // throw(std::bad_alloc)
+
+	void operator delete(void*) noexcept;
+	void operator delete[](void*) noexcept;
+	void operator delete(void*, std::size_t) noexcept;
+	void operator delete[](void*, std::size_t) noexcept;
+
+	void* operator new(std::size_t, const std::nothrow_t&) noexcept;      // return nullptr
+	void* operator new[](std::size_t, const std::nothrow_t&) noexcept;    // return nullptr
+	void operator delete(void*, const std::nothrow_t&) noexcept;          // 在不抛出异常的new表达式中，如果对象的构造函数抛出异常时会被调用
+	void operator delete[](void*, const std::nothrow_t&) noexcept;        // 在不抛出异常的new[]表达式中，如果任一个对象的构造函数抛出异常时会被调用
 # endif
 
 #elif defined(ACL_CPP_DEBUG_MEM)
@@ -26,9 +42,23 @@ void  operator delete(void *p) throw();
  * #include "acl_cpp/stdlib/malloc.hpp
  * 最后，应用程序在创建对象时应使用 NEW 来替代 new.
  */
-void* operator new(size_t, const char*, const char*, int) throw();
-void operator delete(void*) throw();
-void operator delete(void*, size_t) throw();
+
+#include <new>
+
+void* operator new(std::size_t, const char*, const char*, int);      // throw(std::bad_alloc)
+void* operator new[](std::size_t, const char*, const char*, int);    // throw(std::bad_alloc)
+void operator delete(void*, const char*, const char*, int);          // 对象构造函数抛出异常时会被拥有匹配签名的自定义布置new表达式调用
+void operator delete[](void*, const char*, const char*, int);        // 对象构造函数抛出异常时会被拥有匹配签名的自定义布置new[]表达式调用
+
+void operator delete(void*) noexcept;
+void operator delete[](void*) noexcept;
+void operator delete(void*, std::size_t) noexcept;
+void operator delete[](void*, std::size_t) noexcept;
+
+// void* operator new(std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;
+// void* operator new[](std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;
+// void operator delete(void*, const std::nothrow_t&, const char*, const char*, int) noexcept;
+// void operator delete[](void*, const std::nothrow_t&, const char*, const char*, int) noexcept;
 
 #define NEW new(__FILE__, __FUNCTION__, __LINE__)
 

@@ -22,12 +22,48 @@ void  operator delete(void *p)
 
 # else  // ACL_WINDOWS
 
-void* operator new(size_t n) throw (std::bad_alloc)
-{
+void* operator new(std::size_t n) {
+	if (void *ptr = acl::acl_new(n, __FILE__, __FUNCTION__, __LINE__)) {
+		return ptr;
+	}
+	throw std::bad_alloc{};
+}
+
+void* operator new[](std::size_t n) {
+	if (void *ptr = acl::acl_new(n, __FILE__, __FUNCTION__, __LINE__)) {
+		return ptr;
+	}
+	throw std::bad_alloc{};
+}
+
+void operator delete(void* p) noexcept {
+	acl::acl_delete(p, __FILE__, __FUNCTION__, __LINE__);
+}
+
+void operator delete[](void* p) noexcept {
+	acl::acl_delete(p, __FILE__, __FUNCTION__, __LINE__);
+}
+
+void operator delete(void* p, std::size_t) noexcept {
+	acl::acl_delete(p, __FILE__, __FUNCTION__, __LINE__);
+}
+
+void operator delete[](void* p, std::size_t) noexcept {
+	acl::acl_delete(p, __FILE__, __FUNCTION__, __LINE__);
+}
+
+void* operator new(std::size_t n, const std::nothrow_t&) noexcept {
 	return acl::acl_new(n, __FILE__, __FUNCTION__, __LINE__);
 }
-void  operator delete(void *p) throw()
-{
+
+void* operator new[](std::size_t n, const std::nothrow_t&) noexcept {
+	return acl::acl_new(n, __FILE__, __FUNCTION__, __LINE__);
+}
+
+void operator delete(void* p, const std::nothrow_t&) noexcept {
+	acl::acl_delete(p, __FILE__, __FUNCTION__, __LINE__);
+}
+void operator delete[](void* p, const std::nothrow_t&) noexcept {
 	acl::acl_delete(p, __FILE__, __FUNCTION__, __LINE__);
 }
 
@@ -89,9 +125,12 @@ static void mem_checker_unlock(void)
 }
 
 void* operator new(size_t size, const char* file, const char* func,
-	int line) throw()
+	int line)
 {
 	void* ptr = malloc(size);
+	if (!ptr) {
+		throw std::bad_alloc{};
+	}
 
 	mem_checker_once();
 	mem_checker_lock();
@@ -122,6 +161,10 @@ void* operator new(size_t size, const char* file, const char* func,
 
 	mem_checker_unlock();
 	return ptr;
+}
+
+void* operator new[](size_t size, const char* file, const char* func, int line) {
+	return ::operator new(size, file, func, line);
 }
 
 static void free_mem(void* ptr)
@@ -163,13 +206,29 @@ static void free_mem(void* ptr)
 	mem_checker_unlock();
 }
 
-void operator delete(void* ptr) throw()
+void operator delete(void* ptr) noexcept
 {
 	free_mem(ptr);
 }
 
-void operator delete(void* ptr, size_t) throw()
+void operator delete(void* ptr, size_t) noexcept
 {
+	free_mem(ptr);
+}
+
+void operator delete[](void* ptr) noexcept {
+	free_mem(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t) noexcept {
+	free_mem(ptr);
+}
+
+void operator delete(void* ptr, const char* file, const char* func, int line) {
+	free_mem(ptr);
+}
+
+void operator delete[](void* ptr, const char* file, const char* func, int line) {
 	free_mem(ptr);
 }
 
