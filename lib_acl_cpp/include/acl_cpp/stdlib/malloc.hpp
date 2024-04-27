@@ -16,18 +16,20 @@
 # else
 	#include <new>
 
-	void* operator new(std::size_t);      // throw(std::bad_alloc)
-	void* operator new[](std::size_t);    // throw(std::bad_alloc)
+	void* operator new(std::size_t);                                      // throw(std::bad_alloc)
+	void* operator new[](std::size_t);                                    // throw(std::bad_alloc)
+	void* operator new(std::size_t, const std::nothrow_t&) noexcept;      // return nullptr
+	void* operator new[](std::size_t, const std::nothrow_t&) noexcept;    // return nullptr
 
 	void operator delete(void*) noexcept;
 	void operator delete[](void*) noexcept;
 	void operator delete(void*, std::size_t) noexcept;
 	void operator delete[](void*, std::size_t) noexcept;
 
-	void* operator new(std::size_t, const std::nothrow_t&) noexcept;      // return nullptr
-	void* operator new[](std::size_t, const std::nothrow_t&) noexcept;    // return nullptr
-	void operator delete(void*, const std::nothrow_t&) noexcept;          // 在不抛出异常的new表达式中，如果对象的构造函数抛出异常时会被调用
-	void operator delete[](void*, const std::nothrow_t&) noexcept;        // 在不抛出异常的new[]表达式中，如果任一个对象的构造函数抛出异常时会被调用
+	void operator delete(void*, const std::nothrow_t&) noexcept;                   // 在不抛出异常的new表达式中，如果对象的构造函数抛出异常时会被调用
+	void operator delete[](void*, const std::nothrow_t&) noexcept;                 // 在不抛出异常的new[]表达式中，如果任一个对象的构造函数抛出异常时会被调用
+	void operator delete(void*, std::size_t, const std::nothrow_t&) noexcept;      // 在不抛出异常的new表达式中，如果对象的构造函数抛出异常时会被调用
+	void operator delete[](void*, std::size_t, const std::nothrow_t&) noexcept;    // 在不抛出异常的new[]表达式中，如果任一个对象的构造函数抛出异常时会被调用
 # endif
 
 #elif defined(ACL_CPP_DEBUG_MEM)
@@ -45,22 +47,37 @@
 
 #include <new>
 
-void* operator new(std::size_t, const char*, const char*, int);      // throw(std::bad_alloc)
-void* operator new[](std::size_t, const char*, const char*, int);    // throw(std::bad_alloc)
-void operator delete(void*, const char*, const char*, int);          // 对象构造函数抛出异常时会被拥有匹配签名的自定义布置new表达式调用
-void operator delete[](void*, const char*, const char*, int);        // 对象构造函数抛出异常时会被拥有匹配签名的自定义布置new[]表达式调用
+void* operator new(std::size_t, const char*, const char*, int);                                      // throw(std::bad_alloc)
+void* operator new[](std::size_t, const char*, const char*, int);                                    // throw(std::bad_alloc)
+void* operator new(std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;      // return nullptr
+void* operator new[](std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;    // return nullptr
 
+// 显示调用
 void operator delete(void*) noexcept;
 void operator delete[](void*) noexcept;
 void operator delete(void*, std::size_t) noexcept;
 void operator delete[](void*, std::size_t) noexcept;
 
-// void* operator new(std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;
-// void* operator new[](std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;
-// void operator delete(void*, const std::nothrow_t&, const char*, const char*, int) noexcept;
-// void operator delete[](void*, const std::nothrow_t&, const char*, const char*, int) noexcept;
+// 隐式调用
+void operator delete(void*, const std::nothrow_t&) noexcept;                   // 在不抛出异常的new表达式中，如果对象的构造函数抛出异常时会被调用
+void operator delete[](void*, const std::nothrow_t&) noexcept;                 // 在不抛出异常的new[]表达式中，如果任一个对象的构造函数抛出异常时会被调用
+void operator delete(void*, std::size_t, const std::nothrow_t&) noexcept;      // 在不抛出异常的new表达式中，如果对象的构造函数抛出异常时会被调用
+void operator delete[](void*, std::size_t, const std::nothrow_t&) noexcept;    // 在不抛出异常的new[]表达式中，如果任一个对象的构造函数抛出异常时会被调用
+
+void operator delete(void*, const char*, const char*, int) noexcept;                         // 对象构造函数抛出异常时会被拥有匹配签名的自定义布置new表达式调用
+void operator delete[](void*, const char*, const char*, int) noexcept;                       // 对象构造函数抛出异常时会被拥有匹配签名的自定义布置new[]表达式调用
+void operator delete(void*, std::size_t, const char*, const char*, int) noexcept;
+void operator delete[](void*, std::size_t, const char*, const char*, int) noexcept;
+
+void operator delete(void*, const std::nothrow_t&, const char*, const char*, int) noexcept;
+void operator delete[](void*, const std::nothrow_t&, const char*, const char*, int) noexcept;
+void operator delete(void*, std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;
+void operator delete[](void*, std::size_t, const std::nothrow_t&, const char*, const char*, int) noexcept;
 
 #define NEW new(__FILE__, __FUNCTION__, __LINE__)
+
+// #define NEW new(__FILE__, __FUNCTION__, __LINE__)
+// #define NEW_ARGS(...) new(__VA_ARGS__, __FILE__, __FUNCTION__, __LINE__)
 
 namespace acl {
 
