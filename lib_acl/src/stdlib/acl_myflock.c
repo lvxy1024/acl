@@ -63,8 +63,7 @@ int acl_myflock(ACL_FILE_HANDLE fd, int lock_style, int operation)
 #endif
 
 	/*
-	 * fcntl() is standard and does more than we need, but we can handle
-	 * it.
+	 * fcntl() is standard and does more than we need, but we can handle it.
 	 */
 #ifdef ACL_HAS_FCNTL_LOCK
 	case ACL_FLOCK_STYLE_FCNTL:
@@ -76,14 +75,18 @@ int acl_myflock(ACL_FILE_HANDLE fd, int lock_style, int operation)
 		};
 
 		memset((char *) &lock, 0, sizeof(lock));
-		lock.l_type = lock_ops[operation & ~ACL_FLOCK_OP_NOWAIT];
+		lock.l_type   = lock_ops[operation & ~ACL_FLOCK_OP_NOWAIT];
+		lock.l_whence = SEEK_SET;
+		lock.l_start  = 0;
+		lock.l_len    = 0;;
 		request = (operation & ACL_FLOCK_OP_NOWAIT) ? F_SETLK : F_SETLKW;
 		while ((status = fcntl(fd, request, &lock)) < 0
 			&& request == F_SETLKW
 			&& (acl_last_error() == ACL_EINTR
 			    || acl_last_error() == ENOLCK
-				|| acl_last_error() == EDEADLK))
+			    || acl_last_error() == EDEADLK)) {
 			sleep(1);
+		}
 		break;
 	}
 #endif
@@ -101,7 +104,7 @@ int acl_myflock(ACL_FILE_HANDLE fd, int lock_style, int operation)
 			acl_set_error(ACL_EAGAIN);
 	}
 
-	return (status);
+	return status;
 }
 #endif /* ACL_UNIX */
 
@@ -148,7 +151,7 @@ int acl_myflock(ACL_FILE_HANDLE fd, int lock_style acl_unused, int operation)
 	}
 
 	acl_msg_error("%s(%d): invalid lock_op(%d)", myname, __LINE__, lock_op);
-	return (-1);
+	return -1;
 }
 # else
 /* use LockFileEx/UnlockFileEx */

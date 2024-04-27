@@ -2,64 +2,66 @@
 #include "../acl_cpp_define.hpp"
 #include <stdarg.h>
 
-#define logger_open	acl::log::open
-#define logger_close	acl::log::close
+#ifndef ACL_LOGGER_MACRO_OFF
 
-#if defined(_WIN32) || defined(_WIN64)
+# define logger_open	acl::log::open
+# define logger_close	acl::log::close
 
-# if _MSC_VER >= 1500
-#  define logger(fmt, ...)  \
-	acl::log::msg4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
-#  define logger_warn(fmt, ...)  \
-	acl::log::warn4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
-#  define logger_error(fmt, ...)  \
-	acl::log::error4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
-#  define logger_fatal(fmt, ...)  \
-	acl::log::fatal4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
-#  define logger_debug(section, level, fmt, ...)  \
-	acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
+# if defined(_WIN32) || defined(_WIN64)
+
+#  if _MSC_VER >= 1500
+#   define logger(fmt, ...)  \
+        acl::log::msg4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
+#   define logger_warn(fmt, ...)  \
+        acl::log::warn4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
+#   define logger_error(fmt, ...)  \
+        acl::log::error4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
+#   define logger_fatal(fmt, ...)  \
+        acl::log::fatal4(__FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
+#   define logger_debug(section, level, fmt, ...)  \
+        acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, __VA_ARGS__)
+#  else
+#   define logger       acl::log::msg1
+#   define logger_warn  acl::log::warn1
+#   define logger_error acl::log::error1
+#   define logger_fatal acl::log::fatal1
+#   define logger_debug acl::log::msg3
+#  endif
+
 # else
-#  define logger	acl::log::msg1
-#  define logger_warn	acl::log::warn1
-#  define logger_error	acl::log::error1
-#  define logger_fatal	acl::log::fatal1
-#  define logger_debug	acl::log::msg3
+
+#  ifdef ACL_CPP_LOG_SKIP_FILE
+#   define logger(fmt, args...)  \
+        acl::log::msg4("none", __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_warn(fmt, args...)  \
+        acl::log::warn4("none", __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_error(fmt, args...)  \
+        acl::log::error4("none", __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_fatal(fmt, args...)  \
+        acl::log::fatal4("none", __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_debug(section, level, fmt, args...)  \
+        acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, ##args)
+#  else
+#   define logger(fmt, args...)  \
+        acl::log::msg4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_warn(fmt, args...)  \
+        acl::log::warn4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_error(fmt, args...)  \
+        acl::log::error4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_fatal(fmt, args...)  \
+        acl::log::fatal4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
+#   define logger_debug(section, level, fmt, args...)  \
+        acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, ##args)
+#  endif
+
 # endif
-
-#else
-
-# ifdef ACL_CPP_LOG_SKIP_FILE
-#  define logger(fmt, args...)  \
-	acl::log::msg4("none", __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_warn(fmt, args...)  \
-	acl::log::warn4("none", __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_error(fmt, args...)  \
-	acl::log::error4("none", __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_fatal(fmt, args...)  \
-	acl::log::fatal4("none", __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_debug(section, level, fmt, args...)  \
-	acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-# else
-#  define logger(fmt, args...)  \
-	acl::log::msg4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_warn(fmt, args...)  \
-	acl::log::warn4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_error(fmt, args...)  \
-	acl::log::error4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_fatal(fmt, args...)  \
-	acl::log::fatal4(__FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-#  define logger_debug(section, level, fmt, args...)  \
-	acl::log::msg6(section, level, __FILE__, __LINE__, __FUNCTION__, fmt, ##args)
-# endif
-
-#endif
+#endif // ACL_LOG_MACRO_OFF
 
 namespace acl {
 
 class string;
 
-class ACL_CPP_API log
-{
+class ACL_CPP_API log {
 public:
 	/**
 	 * 打开日志文件, 在程序初始化里调用本函数一次
@@ -142,12 +144,14 @@ public:
 	/************************************************************************/
 	/*                        示例                                          */
 	/************************************************************************/
-	static void logger_test1(void)
-	{
-#define DEBUG_BASE	100
-#define DEBUG_TEST1	(DEBUG_BASE + 1)
-#define DEBUG_TEST2	(DEBUG_BASE + 2)
-#define DEBUG_TEST3	(DEBUG_BASE + 3)
+
+#ifndef ACL_LOGGER_MACRO_OFF
+
+	static void logger_test1(void) {
+# define DEBUG_TEST_BASE	100
+# define DEBUG_TEST1		(DEBUG_TEST_BASE + 1)
+# define DEBUG_TEST2		(DEBUG_TEST_BASE + 2)
+# define DEBUG_TEST3		(DEBUG_TEST_BASE + 3)
 
 		const char* logfile = "test.log", *procname = "test";
 		const char* cfg = "101:2; 102:3; 103:2";
@@ -155,7 +159,7 @@ public:
 		// 在程序初始化时打开日志
 		logger_open(logfile, procname, cfg);
 
-#if defined(VC2003) || defined(VC2002) || defined(VC6)
+# if defined(VC2003) || defined(VC2002) || defined(VC6)
 
 		// 会写日志
 
@@ -173,7 +177,7 @@ public:
 		logger_debug(DEBUG_TEST1, 3, "%s(%d), %s: hello world21(%s)!",
 			__FILE__, __LINE__, __FUNCTION__, "zsx");
 
-#else	// VC2005, VC2008, VC2010
+# else	// VC2005, VC2008, VC2010
 
 		// 会写日志
 
@@ -187,18 +191,20 @@ public:
 
 		logger_debug(DEBUG_TEST1, 3, "hello world21(%s)!", "zsx");
 
-#endif
+# endif
 
 		// 程序结束前关闭日志
 		logger_close();
 	}
-	static void logger_test2(void)
-	{
+
+	static void logger_test2(void) {
 		logger("logger ok!");
 		logger_warn("logger_warn ok!");
 		logger_error("logger_error ok!");
 		logger_fatal("logger_fatal ok!");
 	}
+
+#endif // ACL_LOGGER_MACRO_OFF
 };
 
 } // namespace acl

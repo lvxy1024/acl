@@ -8,7 +8,7 @@ project(acl)
 #message(project_dir=${PROJECT_SOURCE_DIR})
 
 if (${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
-	message(FATAL_ERROR "Please into another dir to build!")
+	message(FATAL_ERROR "Please into another dir to build! ${CMAKE_BINARY_DIR}, ${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if (CMAKE_SYSTEM_NAME MATCHES "Android")
@@ -104,7 +104,10 @@ set(sources
 )
 
 foreach(iter ${sources})
-	aux_source_directory(${iter} lib_src)
+	if (ACL_BUILD_VERBOSE MATCHES "YES")
+		message(STATUS ">>add dir ${iter}")
+	endif()
+	aux_source_directory(${iter} acl_src)
 endforeach()
 
 ##############################################################################
@@ -171,17 +174,17 @@ if (ACL_CLIENT_ONLY MATCHES "YES")
 endif()
 
 if (CMAKE_SYSTEM_NAME MATCHES "Android")
-	set(lib_output_path ${CMAKE_CURRENT_SOURCE_DIR}/../android/lib/${ANDROID_ABI})
+	set(acl_output_path ${CMAKE_CURRENT_SOURCE_DIR}/../android/lib/${ANDROID_ABI})
 elseif (CMAKE_SYSTEM_NAME MATCHES "OHOS")
-	set(lib_output_path ${CMAKE_CURRENT_SOURCE_DIR}/../harmony/lib/${OHOS_ARCH})
+	set(acl_output_path ${CMAKE_CURRENT_SOURCE_DIR}/../harmony/lib/${OHOS_ARCH})
 else()
-	set(lib_output_path ${PROJECT_BINARY_DIR}/../lib)
+	set(acl_output_path ${PROJECT_BINARY_DIR}/../lib)
 endif()
 
-set(LIBRARY_OUTPUT_PATH ${lib_output_path})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${lib_output_path})
+set(LIBRARY_OUTPUT_PATH ${acl_output_path})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${acl_output_path})
 
-add_library(acl_static STATIC ${lib_src})
+add_library(acl_static STATIC ${acl_src})
 
 if (${WIN_OS})
 	SET_TARGET_PROPERTIES(acl_static PROPERTIES OUTPUT_NAME "libacl")
@@ -189,9 +192,25 @@ else()
 	SET_TARGET_PROPERTIES(acl_static PROPERTIES OUTPUT_NAME "acl")
 endif()
 
-link_directories(${lib_output_path})
+link_directories(${acl_output_path})
 
-if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED MATCHES "YES")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	install(TARGETS acl_static
+		EXPORT acl_static-targets
+		ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	)
+endif()
+
+if (CMAKE_INSTALL_INCLUDEDIR MATCHES "")
+	set(CMAKE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+endif()
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/acl-lib/acl/"
+)
+
+#if ((NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR) AND ACL_BUILD_SHARED MATCHES "YES")
+if (ACL_BUILD_SHARED MATCHES "YES")
 	if (CMAKE_SYSTEM_NAME MATCHES "Android")
 		if (ANDROID_STL MATCHES "gnustl_shared")
 			set(sys_ldflags "-shared")
@@ -204,11 +223,28 @@ if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED 
 		target_compile_options(acl_static PRIVATE -fvisibility=hidden)
 	elseif (${UNIX_OS})
 		set(sys_ldflags "-shared -lpthread -ldl")
-		target_compile_options(acl_static PRIVATE -fvisibility=hidden)
+#		target_compile_options(acl_static PRIVATE -fvisibility=hidden)
+
+		if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+			set(CMAKE_MACOSX_RPATH 1)
+		endif()
 	endif()
 
 	set(CMAKE_SHARED_LINKER_FLAGS "${sys_ldflags}")
-	add_library(acl SHARED ${lib_src})
+	add_library(acl_shared SHARED ${acl_src})
+
+	if (${WIN_OS})
+		SET_TARGET_PROPERTIES(acl_shared PROPERTIES OUTPUT_NAME "libacl")
+	else()
+		SET_TARGET_PROPERTIES(acl_shared PROPERTIES OUTPUT_NAME "acl")
+	endif()
+
+	if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
+		install(TARGETS acl_shared
+			EXPORT acl_shared-targets
+			LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+		)
+	endif()
 endif()
 
 ##############################################################################

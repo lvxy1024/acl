@@ -127,8 +127,10 @@ set(sources
 )
 
 foreach(iter ${sources})
+	if (ACL_BUILD_VERBOSE MATCHES "YES")
+		message(STATUS ">>add dir ${iter}")
+	endif()
 	aux_source_directory(${iter} lib_src)
-	message(STATUS ">>add dir ${iter}")
 endforeach()
 
 list(APPEND lib_src ${src}/fiber/boost/make_gas.S
@@ -153,7 +155,23 @@ endif()
 
 link_directories(${lib_output_path})
 
-if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED MATCHES "YES")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	install(TARGETS fiber_static
+		EXPORT fiber_static-targets
+		ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	)
+endif()
+
+if (CMAKE_INSTALL_INCLUDEDIR MATCHES "")
+	set(CMAKE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+endif()
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/fiber/
+	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/acl-lib/fiber"
+)
+
+#if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED MATCHES "YES")
+if (ACL_BUILD_SHARED MATCHES "YES")
 	if (CMAKE_SYSTEM_NAME MATCHES "Android")
 		if (ANDROID_STL MATCHES "gnustl_shared")
 			set(sys_ldflags "-shared -O3")
@@ -164,10 +182,22 @@ if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED 
 	elseif (${UNIX_OS})
 		set(sys_ldflags "-shared -O3")
 		target_compile_options(fiber_static PRIVATE -fvisibility=hidden)
+
+		if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+			set(CMAKE_MACOSX_RPATH 1)
+		endif()
 	endif()
 
 	set(CMAKE_SHARED_LINKER_FLAGS "${sys_ldflags}")
-	add_library(fiber SHARED ${lib_src})
+	add_library(fiber_shared SHARED ${lib_src})
+	SET_TARGET_PROPERTIES(fiber_shared PROPERTIES OUTPUT_NAME "fiber")
+
+	if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
+		install(TARGETS fiber_shared
+			EXPORT fiber_shared-targets
+			LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+		)
+	endif()
 endif()
 
 ##############################################################################

@@ -75,6 +75,9 @@ set(sources
 )
 
 foreach (iter ${sources})
+	if (ACL_BUILD_VERBOSE MATCHES "YES")
+		message(STATUS ">>add dir ${iter}")
+	endif()
 	aux_source_directory(${iter} lib_src)
 endforeach()
 
@@ -139,7 +142,23 @@ endif()
 
 link_directories(${lib_output_path})
 
-if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED MATCHES "YES")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
+	install(TARGETS protocol_static
+		EXPORT protocol_static-targets
+		ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	)
+endif()
+
+if (CMAKE_INSTALL_INCLUDEDIR MATCHES "")
+	set(CMAKE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+endif()
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/acl-lib/protocol/"
+)
+
+#if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED MATCHES "YES")
+if (ACL_BUILD_SHARED MATCHES "YES")
 	if (CMAKE_SYSTEM_NAME MATCHES "Android")
 		if (ANDROID_STL MATCHES "gnustl_shared")
 			set(sys_ldflags "-shared -lz")
@@ -152,18 +171,25 @@ if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND ACL_BUILD_SHARED 
 		target_compile_options(protocol_static PRIVATE -fvisibility=hidden)
 	elseif (${UNIX_OS})
 		set(sys_ldflags "-shared -lz -lpthread -ldl")
-		target_compile_options(protocol_static PRIVATE -fvisibility=hidden)
+#		target_compile_options(protocol_static PRIVATE -fvisibility=hidden)
+
+		if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+			set(CMAKE_MACOSX_RPATH 1)
+		endif()
 	endif()
 
-	if (ACL_BUILD_SHARED_ONE MATCHES "YES")
-		set(lc_flags "${lib_output_path}/libacl.a")
-		set(CMAKE_SHARED_LINKER_FLAGS "${lc_flags} ${sys_ldflags}")
-		add_library(protocol SHARED ${lib_src})
-	else()
-		set(lc_flags "-Wl,-rpath,. -L${lib_output_path} -lacl")
-		set(CMAKE_SHARED_LINKER_FLAGS "${lc_flags} ${sys_ldflags}")
-		add_library(protocol SHARED ${lib_src})
-		target_link_libraries(protocol acl)
+	set(lc_flags "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib -L${lib_output_path}")
+	set(CMAKE_SHARED_LINKER_FLAGS "${lc_flags} ${sys_ldflags}")
+	add_library(protocol_shared SHARED ${lib_src})
+	target_link_libraries(protocol_shared acl)
+
+	SET_TARGET_PROPERTIES(protocol_shared PROPERTIES OUTPUT_NAME "protocol")
+
+	if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
+		install(TARGETS protocol_shared
+			EXPORT protocol_shared-targets
+			LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+		)
 	endif()
 endif()
 
