@@ -2,12 +2,12 @@
 #ifndef ACL_PREPARE_COMPILE
 #include "acl_cpp/stdlib/log.hpp"
 #include "acl_cpp/stdlib/locker.hpp"
+#include "acl_cpp/stdlib/util.hpp"
 #include "acl_cpp/connpool/connect_client.hpp"
 #include "acl_cpp/connpool/connect_pool.hpp"
 #endif
 
-namespace acl
-{
+namespace acl {
 
 connect_pool::connect_pool(const char* addr, size_t max, size_t idx /* = 0 */)
 : alive_(true)
@@ -31,7 +31,7 @@ connect_pool::connect_pool(const char* addr, size_t max, size_t idx /* = 0 */)
 	acl_lowercase(key_);
 }
 
-connect_pool::~connect_pool(void)
+connect_pool::~connect_pool()
 {
 	std::list<connect_client*>::iterator it = pool_.begin();
 	for (; it != pool_.end(); ++it) {
@@ -45,10 +45,12 @@ void connect_pool::set_key(const char* key)
 	acl_lowercase(key_);
 }
 
-connect_pool& connect_pool::set_timeout(int conn_timeout, int rw_timeout)
+connect_pool& connect_pool::set_timeout(int conn_timeout, int rw_timeout,
+	bool sockopt_timeo /* false */)
 {
 	conn_timeout_ = conn_timeout;
-	rw_timeout_ = rw_timeout;
+	rw_timeout_   = rw_timeout;
+	sockopt_timo_ = sockopt_timeo;
 	return *this;
 }
 
@@ -108,8 +110,27 @@ bool connect_pool::aliving()
 	return false;
 }
 
-connect_client* connect_pool::peek(bool on /* = true */)
+connect_client* connect_pool::peek(bool on, double* tc, bool* old)
 {
+	struct timeval begin;
+
+#define	SET_TIME_COST do {                                                    \
+	if (tc) {                                                             \
+		struct timeval end;                                           \
+		gettimeofday(&end, NULL);                                     \
+		*tc = stamp_sub(end, begin);                                  \
+	}                                                                     \
+} while (0)
+
+	if (tc) {
+		*tc = 0.0;
+		gettimeofday(&begin, NULL);
+	}
+
+	if (old) {
+		*old = false;
+	}
+
 	lock_.lock();
 	if (alive_ == false) {
 		time_t now = time(NULL);
@@ -133,16 +154,27 @@ connect_client* connect_pool::peek(bool on /* = true */)
 		current_used_++;
 
 		lock_.unlock();
+
+		SET_TIME_COST;
+
+		if (old) {
+			*old = true;
+		}
+
 		return conn;
 	} else if (max_ > 0 && count_ >= max_) {
 		logger_error("too many connections, max: %d, curr: %d,"
 			" server: %s", (int) max_, (int) count_, addr_);
 		lock_.unlock();
+
+		SET_TIME_COST;
 		return NULL;
 	}
 
 	if (!on) {
 		lock_.unlock();
+
+		SET_TIME_COST;
 		return NULL;
 	}
 
@@ -155,12 +187,27 @@ connect_client* connect_pool::peek(bool on /* = true */)
 
 	// 调用虚函数的子类实现方法，创建新连接对象，并打开连接
 	conn = create_connect();
+	if (conn == NULL) {
+		lock_.lock();
+		count_--;
+		total_used_--;
+		current_used_--;
+#ifdef AUTO_SET_ALIVE
+		alive_ = false;
+		(void) time(&last_dead_);
+#endif
+		lock_.unlock();
+
+		SET_TIME_COST;
+		return NULL;
+	}
+
 	// 在调用 open 之前先设置超时时间
 	conn->set_timeout(conn_timeout_, rw_timeout_);
-	// 调用子类方法打开连接
-	if (conn->open() == false) {
-		lock_.lock();
 
+	// 调用子类方法打开连接
+	if (!conn->open()) {
+		lock_.lock();
 		// 因为打开连接失败，所以还需将上面预 +1 的三个成员再 -1
 		count_--;
 		total_used_--;
@@ -169,13 +216,16 @@ connect_client* connect_pool::peek(bool on /* = true */)
 		alive_ = false;
 		(void) time(&last_dead_);
 #endif
-
 		lock_.unlock();
 		delete conn;
+
+		SET_TIME_COST;
 		return NULL;
 	}
 
 	conn->set_pool(this);
+
+	SET_TIME_COST;
 	return conn;
 }
 
@@ -226,11 +276,29 @@ void connect_pool::put(connect_client* conn, bool keep /* = true */)
 		delete conn;
 	}
 
-	if (idle_ttl_ >= 0 && now - last_check_ >= check_inter_) {
-		(void) check_idle(idle_ttl_, false);
+	if (check_inter_ >= 0 && now - last_check_ >= check_inter_) {
+		(void) check_idle(idle_ttl_, false, false);
 		(void) time(&last_check_);
 	}
 	lock_.unlock();
+}
+
+void connect_pool::refer()
+{
+	lock_.lock();
+	++count_;
+	lock_.unlock();
+}
+
+void connect_pool::unrefer()
+{
+	lock_.lock();
+	if (--count_ <= 0 && delay_destroy_) {
+		lock_.unlock();
+		delete this;
+	} else {
+		lock_.unlock();
+	}
 }
 
 void connect_pool::set_delay_destroy()
@@ -250,7 +318,12 @@ void connect_pool::set_alive(bool yes /* true | false */)
 	lock_.unlock();
 }
 
-int connect_pool::check_idle(time_t ttl, bool exclusive /* = true */)
+int connect_pool::check_idle(time_t ttl, bool exclusive /* true */)
+{
+	return check_idle(ttl, false, exclusive);
+}
+
+int connect_pool::check_idle(time_t ttl, bool kick_dead, bool exclusive)
 {
 	if (ttl < 0) {
 		return 0;
@@ -301,11 +374,59 @@ int connect_pool::check_idle(time_t ttl, bool exclusive /* = true */)
 		if ((*it)->get_pool() == this) {
 			count_--;
 		}
-		delete *it;
 
+		delete *it;
 		next = pool_.erase(it);
 		rit = std::list<connect_client*>::reverse_iterator(next);
+		n++;
+	}
 
+	if (kick_dead) {
+		for (it = pool_.begin(); it != pool_.end();) {
+			if ((*it)->alive()) {
+				++it;
+				continue;
+			}
+
+			if ((*it)->get_pool() == this) {
+				count_--;
+			}
+			delete *it;
+			it = pool_.erase(it);
+			n++;
+		}
+	}
+
+	if (exclusive) {
+		lock_.unlock();
+	}
+
+	return n;
+}
+
+size_t connect_pool::check_dead(bool exclusive /* true */) {
+	if (exclusive) {
+		lock_.lock();
+	}
+
+	std::list<connect_client*>::iterator it, next;
+	std::list<connect_client*>::reverse_iterator rit = pool_.rbegin();
+
+	size_t n = 0;
+
+	for (; rit != pool_.rend();) {
+		it = --rit.base();
+		if ((*it)->alive()) {
+			continue;
+		}
+
+		if ((*it)->get_pool() == this) {
+			count_--;
+		}
+
+		delete *it;
+		next = pool_.erase(it);
+		rit = std::list<connect_client*>::reverse_iterator(next);
 		n++;
 	}
 
@@ -313,6 +434,35 @@ int connect_pool::check_idle(time_t ttl, bool exclusive /* = true */)
 		lock_.unlock();
 	}
 	return n;
+}
+
+size_t connect_pool::keep_minimal(size_t min) {
+	lock_.lock();
+	if (min > 0 && min > get_count()) {
+		min -= get_count();
+	} else {
+		min = 0;
+	}
+	lock_.unlock();
+
+	for (size_t i = 0; i < min; i++) {
+		connect_client* conn = create_connect();
+		if (conn == NULL) {
+			break;
+		}
+		if (!conn->open()) {
+			delete conn;
+			break;
+		}
+
+		lock_.lock();
+		count_++;
+		lock_.unlock();
+
+		conn->set_pool(this);
+		put(conn, true);
+	}
+	return count_;
 }
 
 } // namespace acl
