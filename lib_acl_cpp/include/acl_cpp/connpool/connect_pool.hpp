@@ -8,6 +8,17 @@ namespace acl {
 
 class connect_manager;
 class connect_client;
+class thread_pool;
+
+/**
+ * 该类型定义了当调用 connect_pool::put() 时oper的行为
+ */
+typedef enum {
+	cpool_put_oper_none  = 0,		// 不做任何操作
+	cpool_put_check_idle = 1,		// 检测并关闭超时空闲连接
+	cpool_put_check_dead = (1 << 1),	// 检测并关闭异常连接
+	cpool_put_keep_conns = (1 << 2),	// 尽量操持最小连接数
+} cpool_put_oper_t;
 
 /**
  * 客户端连接池类，实现对连接池的动态管理，该类为纯虚类，需要子类实现
@@ -41,6 +52,13 @@ public:
 		bool sockopt_timo = false);
 
 	/**
+	 * 设置连接池最小连接数，在check_idle/check_dead后可以用来保持最小连接数
+	 * @param min {size_t} > 0 时将自动尽量保持最小连接数
+	 * @return {connect_pool&}
+	 */
+	connect_pool& set_conns_min(size_t min);
+
+	/**
 	 * 设置连接池异常的重新设为可用状态的时间间隔
 	 * @param retry_inter {int} 当连接断开后，重新再次打开连接的时间间隔(秒)，
 	 *  当该值 <= 0 时表示允许连接断开后可以立即重连，否则必须超过该时间间隔
@@ -50,7 +68,7 @@ public:
 	connect_pool& set_retry_inter(int retry_inter);
 
 	/**
-	 * 设置连接池中空闲连接的空闲生存周期，只影响每次调用 put 时的空闲时间检测
+	 * 设置连接池中空闲连接的空闲生存周期
 	 * @param ttl {time_t} 空闲连接生存周期，当该值 < 0 表示空闲连接不过期，
 	 *  == 0 时表示立刻过期，> 0 表示空闲该时间段后将被释放
 	 * @return {connect_pool&}
@@ -90,32 +108,33 @@ public:
 	 * 该连接时，则该连接将会被直接释放
 	 * @param conn {redis_client*}
 	 * @param keep {bool} 是否针对该连接保持长连接
+	 * @param oper {cpool_put_oper_t} 自动操作连接池标志位，含义参见上面
+	 *  cpool_put_oper_t 类型定义
 	 */
-	void put(connect_client* conn, bool keep = true);
+	void put(connect_client* conn, bool keep = true,
+		 cpool_put_oper_t oper = cpool_put_check_idle);
 
 	/**
-	 * 检查连接池中空闲的连接，将过期的连接释放掉
-	 * @param ttl {time_t} 过期时间（秒）
-	 * @param kick_dead {bool} 是否自动检测死连接并关闭之
+	 * 检查连接池中空闲的连接，释放过期连接
+	 * @param ttl {time_t} 该值 >= 0 时，过期时间大于此值的连接将被关闭
 	 * @param exclusive {bool} 内部是否需要加锁
-	 * @return {int} 被释放的空闲连接个数
+	 * @return {size_t} 返回被释放空闲连接个数
 	 */
-	int check_idle(time_t ttl, bool kick_dead, bool exclusive);
-	int check_idle(time_t ttl, bool exclusive = true);
+	size_t check_idle(time_t ttl, bool exclusive = true);
+	size_t check_idle(bool exclusive = true);
 
 	/**
-	 * 检测连接状态，并关闭断开连接
-	 * @param exclusive {bool} 内部是否需要加锁
+	 * 检测连接状态，并关闭断开连接，内部自动加锁保护
+	 * @param threads {thread_pool*} 非空时将使用该线程池检测连接状态
 	 * @return {size_t} 被关闭的连接个数
 	 */
-	size_t check_dead(bool exclusive = true);
+	size_t check_dead(thread_pool* threads = NULL);
 
 	/**
-	 * 保持最小活跃连接数
-	 * @param min {size_t} 该值 > 0 表示希望连接池中最小的活跃连接数
-	 * @return {size_t} 返回实际的连接数
+	 * 尽量保持由 set_conns_min() 设置的最小连接数
+	 * @param threads {thread_pool*} 非空时将使用该线程池创建新连接
 	 */
-	size_t keep_minimal(size_t min);
+	void keep_conns(thread_pool* threads = NULL);
 
 	/**
 	 * 设置连接池的存活状态
@@ -190,7 +209,10 @@ public:
 		return key_;
 	}
 
+	// 增加本对象引用计数
 	void refer();
+
+	// 减少本对象引用计数
 	void unrefer();
 
 protected:
@@ -209,6 +231,7 @@ protected:
 
 protected:
 	bool  alive_;				// 是否属正常
+	ssize_t refers_;			// 当前连接池对象的引用计数
 	bool  delay_destroy_;			// 是否设置了延迟自销毁
 	// 有问题的服务器的可以重试的时间间隔，不可用连接池对象再次被启用的时间间隔
 	int   retry_inter_;
@@ -221,6 +244,7 @@ protected:
 	bool  sockopt_timo_;			// 是否使用s setsockopt 设置超时
 	size_t idx_;				// 该连接池对象在集合中的下标位置
 	size_t max_;				// 最大连接数
+	size_t min_;				// 最小连接数
 	size_t count_;				// 当前的连接数
 	time_t idle_ttl_;			// 空闲连接的生命周期
 	time_t last_check_;			// 上次检查空闲连接的时间截
@@ -231,6 +255,18 @@ protected:
 	unsigned long long current_used_;	// 某时间段内的访问量
 	time_t last_;				// 上次记录的时间截
 	std::list<connect_client*> pool_;	// 连接池集合
+
+	size_t check_dead(size_t count);
+	size_t check_dead(size_t count, thread_pool& threads);
+	void keep_conns(size_t min);
+	void keep_conns(size_t min, thread_pool& threads);
+
+	size_t kick_idle_conns(time_t ttl);	// 关闭过期的连接
+	connect_client* peek_back();		// 从尾部 Peek 连接
+	void put_front(connect_client* conn);	// 向头部 Put 连接
+
+	void count_inc(bool exclusive);		// 增加连接数及对象引用计数
+	void count_dec(bool exclusive);		// 减少连接数及对象引用计数
 };
 
 class ACL_CPP_API connect_guard : public noncopyable {
