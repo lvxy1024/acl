@@ -99,7 +99,7 @@ static EPOLL_EVENT *epoll_event_alloc(void)
 		return ee;
 	}
 
-	ee = mem_calloc(1, sizeof(EPOLL_EVENT));
+	ee = (EPOLL_EVENT*) mem_calloc(1, sizeof(EPOLL_EVENT));
 	acl_fiber_set_specific(&__local_key, ee, fiber_on_exit);
 
 	ring_init(&ee->me);
@@ -322,6 +322,13 @@ int epoll_close(int epfd)
 	return (*sys_close)(epfd);
 }
 
+static __thread int __fiber_share_epoll = 0;
+
+void acl_fiber_share_epoll(int yes)
+{
+	__fiber_share_epoll = yes;
+}
+
 // Find the EPOLL_EVENT for the current fiber with the specified epfd, and
 // new one will be created if not found and create is true.
 static EPOLL_EVENT *epoll_event_find(int epfd, int create)
@@ -354,7 +361,12 @@ static EPOLL_EVENT *epoll_event_find(int epfd, int create)
 	}
 
 	// Then, trying to find the EPOLL_EVENT of the current fiber.
-	SNPRINTF(key, sizeof(key), "%u", curr->fid);
+	if (__fiber_share_epoll) {
+		key[0] = '0';
+		key[1] = 0;
+	} else {
+		SNPRINTF(key, sizeof(key), "%u", curr->fid);
+	}
 
 	ee = (EPOLL_EVENT *) htable_find(ep->ep_events, key);
 	if (ee != NULL) {
@@ -724,6 +736,35 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 	}
 
 	return ee->nready;
+}
+
+#define TO_APPL	ring_to_appl
+
+void wakeup_epoll_waiters(EVENT *ev)
+{
+	RING_ITER iter;
+	RING *head;
+	EPOLL_EVENT *ee;
+	long long now = event_get_stamp(ev);
+	TIMER_CACHE_NODE *node = TIMER_FIRST(ev->epoll_timer), *next;
+
+	while (node && node->expire >= 0 && node->expire <= now) {
+		next = TIMER_NEXT(ev->epoll_timer, node);
+
+		ring_foreach(iter, &node->ring) {
+			ee = TO_APPL(iter.ptr, EPOLL_EVENT, me);
+			ee->proc(ev, ee);
+		}
+
+		node = next;
+	}
+
+	while ((head = ring_pop_head(&ev->epoll_ready)) != NULL) {
+		ee = TO_APPL(head, EPOLL_EVENT, me);
+		ee->proc(ev, ee);
+	}
+
+	ring_init(&ev->epoll_ready);
 }
 
 #endif	// end HAS_EPOLL

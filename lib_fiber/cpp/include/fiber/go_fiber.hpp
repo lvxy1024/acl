@@ -12,7 +12,7 @@
 //    201703L (C++17)
 //    202002L (C++20)
 
-#if __cplusplus >= 201103L      // Support c++11 ?
+#if defined(USE_CPP11) || __cplusplus >= 201103L      // Support c++11 ?
 
 struct ACL_FIBER;
 
@@ -39,7 +39,7 @@ public:
 
 class go_fiber {
 public:
-	go_fiber(void) {}
+	go_fiber() {}
 	go_fiber(size_t stack_size, bool on) : stack_size_(stack_size), stack_share_(on) {}
 
 	ACL_FIBER* operator > (std::function<void()> fn) {
@@ -87,7 +87,7 @@ private:
 #endif // __cplusplus >= 201103L
 
 /**
- * static void fiber1(void) {
+ * static void fiber1() {
  * 	printf("fiber: %d\r\n", acl::fiber::self());
  * }
  *
@@ -104,7 +104,7 @@ private:
  *	n++;
  * }
  *
- * static void waiter(void) {
+ * static void waiter() {
  *	int n = 100;
  *
  *	// run in thread and wait for result
@@ -118,7 +118,7 @@ private:
  *  // here: n should be 201
  * }
  *
- * static test(void) {
+ * static test() {
  * 	go fiber1;
  * 	
  * 	acl::string buf("hello");

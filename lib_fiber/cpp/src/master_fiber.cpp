@@ -4,13 +4,13 @@
 
 namespace acl {
 
-master_fiber::master_fiber(void) {}
+master_fiber::master_fiber() {}
 
-master_fiber::~master_fiber(void) {}
+master_fiber::~master_fiber() {}
 
 static bool has_called = false;
 
-const char* master_fiber::get_conf_path(void) const
+const char* master_fiber::get_conf_path() const
 {
 	if (daemon_mode_) {
 		const char* ptr = acl_fiber_server_conf();
@@ -22,7 +22,7 @@ const char* master_fiber::get_conf_path(void) const
 
 void master_fiber::run(int argc, char** argv)
 {
-	// 每个进程只能有一个实例在运行
+	// There's only one instance being running in a process.
 	acl_assert(has_called == false);
 	has_called = true;
 

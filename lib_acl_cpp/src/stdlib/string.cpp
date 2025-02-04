@@ -646,6 +646,28 @@ string& string::push_back(unsigned char ch, bool term /* true */)
     return *this;
 }
 
+char string::back() const
+{
+	if (empty()) {
+		return -1;
+	}
+	const char *pEnd = const_cast<string*>(this)->buf_end();
+	if (pEnd == NIL) {
+		return -1;
+	}
+	return *(pEnd - 1);
+}
+
+bool string::pop_back()
+{
+	size_t n = size();
+	if (n == 0) {
+		return false;
+	}
+	truncate(n - 1);
+	return true;
+}
+
 string& string::terminate()
 {
 	TERM(vbf_);
@@ -1322,12 +1344,50 @@ std::pair<acl::string, acl::string>& string::split_nameval(char sep)
 	}
 
 	if (acl_split_nameval2(STR(vbf_), &name, &value, sep) != NIL) {
-		pair_tmp_->first = "";
+		pair_tmp_->first  = "";
 		pair_tmp_->second = "";
 		return *pair_tmp_;
 	}
 	pair_tmp_->first  = name;
 	pair_tmp_->second = value;
+	return *pair_tmp_;
+}
+
+std::pair<acl::string, acl::string>& string::split_at(char delimiter)
+{
+	if (pair_tmp_ == NIL) {
+		pair_tmp_ = NEW std::pair<acl::string, acl::string>;
+	}
+
+	char *cp = acl_split_at(STR(vbf_), (int) delimiter);
+	if (cp == NIL) {
+		pair_tmp_->first  = "";
+		pair_tmp_->second = "";
+		return *pair_tmp_;
+	}
+
+	pair_tmp_->first  = STR(vbf_);
+	pair_tmp_->second = cp;
+	*--cp = delimiter;
+	return *pair_tmp_;
+}
+
+std::pair<acl::string, acl::string>& string::split_at_right(char delimiter)
+{
+	if (pair_tmp_ == NIL) {
+		pair_tmp_ = NEW std::pair<acl::string, acl::string>;
+	}
+
+	char *cp = acl_split_at_right(STR(vbf_), (int) delimiter);
+	if (cp == NIL) {
+		pair_tmp_->first  = "";
+		pair_tmp_->second = "";
+		return *pair_tmp_;
+	}
+
+	pair_tmp_->first  = STR(vbf_);
+	pair_tmp_->second = cp;
+	*--cp = delimiter;
 	return *pair_tmp_;
 }
 
@@ -1984,6 +2044,52 @@ bool operator == (const acl::string& l, const std::string& r) {
 std::ostream& operator << (std::ostream& o, const acl::string& s) {
 	o << s.c_str();
 	return o;
+}
+
+void split(const char* str, const char* sep, std::vector<std::string>& out) {
+	const char* ptr = str, *start = str;
+	while (*ptr) {
+		if (strchr(sep, (int) (*ptr)) != NULL) {
+			if (start < ptr) {
+				size_t n = ptr - start;
+				std::string buf;
+				buf.assign(start, n);
+				out.push_back(buf);
+			}
+			start = ptr + 1;
+		}
+		ptr++;
+	}
+
+	if (*start) {
+		std::string buf = start;
+		out.push_back(start);
+	}
+}
+
+size_t split(const char* str, const char* sep, std::list<std::string>& out) {
+	size_t cnt = 0;
+	const char* ptr = str, *start = str;
+	while (*ptr) {
+		if (strchr(sep, (int) (*ptr)) != NULL) {
+			if (start < ptr) {
+				size_t n = ptr - start;
+				std::string buf;
+				buf.assign(start, n);
+				out.push_back(buf);
+				cnt++;
+			}
+			start = ptr + 1;
+		}
+		ptr++;
+	}
+
+	if (*start) {
+		out.push_back(start);
+		cnt++;
+	}
+
+	return cnt;
 }
 
 } // namespace acl

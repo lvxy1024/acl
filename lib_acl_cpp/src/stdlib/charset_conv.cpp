@@ -48,7 +48,7 @@ static ACL_DLL_HANDLE __iconv_dll = NULL;
 
 // 程序退出时释放动态加载的 iconv.dll 库
 #ifndef HAVE_NO_ATEXIT
-static void __iconv_dll_unload(void)
+static void __iconv_dll_unload()
 {
 	if (__iconv_dll != NULL) {
 		acl_dlclose(__iconv_dll);
@@ -59,7 +59,7 @@ static void __iconv_dll_unload(void)
 #endif
 
 // 动态加载 iconv.dll 库
-static void __iconv_dll_load(void)
+static void __iconv_dll_load()
 {
 	const char* path = "iconv.dll";
 
@@ -278,7 +278,7 @@ bool charset_conv::update_begin(const char* fromCharset,
 # endif // USE_WIN_ICONV
 #elif defined(ACL_SUNOS5)
 		__iconv(m_iconv, (const char**) &pi, &zi, &po, &zo);
-#elif defined(ACL_FREEBSD)
+#elif defined(ACL_FREEBSD) && !defined(USE_SYS_ICONV)
 		__iconv(m_iconv, (const char**) &pi, &zi, &po, &zo);
 #else
 		__iconv((iconv_t) m_iconv, &pi, &zi, &po, &zo);
@@ -375,7 +375,7 @@ bool charset_conv::update(const char* in, size_t len, acl::string* out)
 # endif // USE_WIN_ICONV
 #elif defined(ACL_SUNOS5)
 		ret = __iconv(m_iconv, (const char**) &pIn, &nIn, &pOut, &nOut);
-#elif defined(ACL_FREEBSD)
+#elif defined(ACL_FREEBSD) && !defined(USE_SYS_ICONV)
 		ret = __iconv(m_iconv, (const char**) &pIn, &nIn, &pOut, &nOut);
 #else
 		ret = __iconv((iconv_t) m_iconv, &pIn, &nIn, &pOut, &nOut);
@@ -412,7 +412,7 @@ bool charset_conv::update(const char* in, size_t len, acl::string* out)
 # endif
 #elif defined(ACL_SUNOS5)
 			__iconv(m_iconv, (const char**) &pi, &zi, &po, &zo);
-#elif defined(ACL_FREEBSD)
+#elif defined(ACL_FREEBSD) && !defined(USE_SYS_ICONV)
 			__iconv(m_iconv, (const char**) &pi, &zi, &po, &zo);
 #else
 			__iconv((iconv_t) m_iconv, &pi, &zi, &po, &zo);
@@ -456,7 +456,7 @@ bool charset_conv::update(const char* in, size_t len, acl::string* out)
 # endif // USE_WIN_ICONV
 #elif defined(ACL_SUNOS5)
 			__iconv(m_iconv, (const char**) &pi, &zi, &po, &zo);
-#elif defined(ACL_FREEBSD)
+#elif defined(ACL_FREEBSD) && !defined(USE_SYS_ICONV)
 			__iconv(m_iconv, (const char**) &pi, &zi, &po, &zo);
 #else
 			__iconv((iconv_t) m_iconv, &pi, &zi, &po, &zo);

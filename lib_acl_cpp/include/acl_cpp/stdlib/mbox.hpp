@@ -1,6 +1,6 @@
 #pragma once
 #include "../acl_cpp_define.hpp"
-#include <assert.h>
+#include <cassert>
 #include "box.hpp"
 
 namespace acl {
@@ -21,10 +21,10 @@ size_t mbox_nread(void*);
  *
  * class myobj {
  * public:
- *     myobj(void) {}
- *     ~myobj(void) {}
+ *     myobj() {}
+ *     ~myobj() {}
  *     
- *     void run(void)
+ *     void run()
  *     {
  *         printf("hello world!\r\n");
  *     }
@@ -32,13 +32,13 @@ size_t mbox_nread(void*);
  * 
  * acl::mbox<myobj> mbox;
  *
- * void thread_producer(void)
+ * void thread_producer()
  * {
  *     myobj* o = new myobj;
  *     mbox.push(o);
  * }
  * 
- * void thread_consumer(void)
+ * void thread_consumer()
  * {
  *     myobj* o = mbox.pop();
  *     o->run();
@@ -55,51 +55,66 @@ public:
 	 *  未被消费的动态对象
 	 * @param mpsc {bool} 是否为多生产者-单消费者模式
 	 */
-	mbox(bool free_obj = true, bool mpsc = true)
+	explicit mbox(bool free_obj = true, bool mpsc = true)
 	: free_obj_(free_obj)
 	{
 		mbox_ = mbox_create(mpsc);
 		assert(mbox_);
 	}
 
-	~mbox(void)
-	{
+	~mbox() {
 		mbox_free(mbox_, free_obj_ ? mbox_free_fn : NULL);
 	}
 
 	/**
 	 * 发送消息对象
 	 * @param t {T*} 非空消息对象
-	 * @param dummy {bool} 目前无任何用处，仅是为了与 tbox 接口一致
 	 * @return {bool} 发送是否成功
 	 * @override
 	 */
-	bool push(T* t, bool dummy = false)
-	{
-		(void) dummy;
+	bool push(T* t, bool dummy = false) {
+        (void) dummy;
 		return mbox_send(mbox_, t);
 	}
 
 	/**
 	 * 接收消息对象
-	 * @param timeout {int} >= 0 时设置读等待超时时间(毫秒级别)，否则
+	 * @param ms {int} >= 0 时设置读等待超时时间(毫秒级别)，否则
 	 *  永远等待直到读到消息对象或出错
 	 * @param success {bool*} 可以用于辅助确定读操作是否成功
 	 * @return {T*} 非 NULL 表示读到一个消息对象，为 NULL 时，还需通过
 	 *  success 参数的返回值检查操作是否成功
 	 * @override
 	 */
-	T* pop(int timeout = -1, bool* success = NULL)
-	{
-		return (T*) mbox_read(mbox_, timeout, success);
+	T* pop(int ms = -1, bool* success = NULL) {
+		return (T*) mbox_read(mbox_, ms, success);
+	}
+
+	// @override
+	size_t pop(std::vector<T*>& out, size_t max, int ms) {
+		size_t n = 0;
+		bool success;
+		while (true) {
+			T* t = (T*) mbox_read(mbox_, ms, &success);
+			if (! t) {
+				return n;
+			}
+
+			out.push_back(t);
+			n++;
+			if (max > 0 && n >= max) {
+				return n;
+			}
+			ms = 0;
+		}
 	}
 
 	/**
-	 * mbox 没有空消息
+	 * mbox 不支持传递空消息
 	 * @return {bool}
 	 * @override
 	 */
-	bool has_null(void) const {
+	bool has_null() const {
 		return false;
 	}
 
@@ -107,8 +122,7 @@ public:
 	 * 统计当前已经发送的消息数
 	 * @return {size_t}
 	 */
-	size_t push_count(void) const
-	{
+	size_t push_count() const {
 		return mbox_nsend(mbox_);
 	}
 
@@ -116,8 +130,7 @@ public:
 	 * 统计当前已经接收到的消息数
 	 * @return {size_t}
 	 */
-	size_t pop_count(void) const
-	{
+	size_t pop_count() const {
 		return mbox_nread(mbox_);
 	}
 
@@ -125,8 +138,7 @@ private:
 	void* mbox_;
 	bool  free_obj_;
 
-	static void mbox_free_fn(void* o)
-	{
+	static void mbox_free_fn(void* o) {
 		T* t = (T*) o;
 		delete t;
 	}

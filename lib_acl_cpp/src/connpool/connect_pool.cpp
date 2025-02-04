@@ -494,6 +494,8 @@ size_t connect_pool::check_dead(thread_pool* threads /* NULL */)
 	if (threads == NULL) {
 		return check_dead(count);
 	}
+
+	// 采用线程池检测，以提升检测效率
 	return check_dead(count, *threads);
 }
 
@@ -552,8 +554,10 @@ size_t connect_pool::check_dead(size_t count, thread_pool& threads)
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	double tc = stamp_sub(end, begin);
-	logger("Addr: %s; threads: limit=%zd, count=%d; jobs count=%zd, %zd, time cost=%.2f ms",
-	       addr_, threads.get_limit(), threads.threads_count(), jobs.size(), count, tc);
+	logger_debug(DEBUG_CPOLL, 1, "Addr: %s; threads: limit=%zd, count=%d;"
+		" jobs count=%zd, %zd, time cost=%.2f ms",
+		addr_, threads.get_limit(), threads.threads_count(),
+		jobs.size(), count, tc);
 
 	for (std::vector<check_job*>::iterator it = jobs.begin();
 	     it != jobs.end(); ++it) {
@@ -603,10 +607,9 @@ connect_client* connect_pool::peek_back()
 	return conn;
 }
 
-
 void connect_pool::put_front(connect_client* conn)
 {
-	time_t now = time(NULL);
+	//time_t now = time(NULL);
 
 	lock_.lock();
 
@@ -629,7 +632,8 @@ void connect_pool::put_front(connect_client* conn)
 
 	alive_ = true;  // 该连接充当服务检测成功功能，所以可在此处设置服务可用
 
-	conn->set_when(now);
+	// 禁止更新过期时间，以防止永远无法过期释放!
+	//conn->set_when(now);
 
 	// 将归还的连接放在链表首部，这样在调用释放过期连接
 	// 时比较方便，有利于尽快将不忙的数据库连接关闭
@@ -729,8 +733,10 @@ void connect_pool::keep_conns(size_t min, thread_pool& threads)
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	double tc = stamp_sub(end, begin);
-	logger("Addr=%s; threads: limit=%zd, count=%d; jobs count=%zd, time cost=%.2f ms",
-		addr_, threads.get_limit(), threads.threads_count(), jobs.size(), tc);
+	logger_debug(DEBUG_CPOLL, 1, "Addr=%s; threads: limit=%zd, count=%d;"
+		" jobs count=%zd, time cost=%.2f ms",
+		addr_, threads.get_limit(), threads.threads_count(),
+		jobs.size(), tc);
 
 	for (std::vector<check_job*>::iterator it = jobs.begin();
 	     it != jobs.end(); ++it) {

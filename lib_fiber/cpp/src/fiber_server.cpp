@@ -79,7 +79,7 @@ static int  acl_var_fiber_hook_log;
 static ACL_CONFIG_BOOL_TABLE __conf_bool_tab[] = {
 	{ "fiber_quick_abort", 1, &acl_var_fiber_quick_abort },
 	{ "fiber_share_stack", 0, &acl_var_fiber_share_stack },
-	{ "fiber_hook_log", 1, &acl_var_fiber_hook_log },
+	{ "fiber_hook_log", 0, &acl_var_fiber_hook_log },
 
 	{ 0, 0, 0 },
 };
@@ -113,7 +113,7 @@ typedef struct FIBER_SERVER {
 	int           fdtype;
 } FIBER_SERVER;
 
-const char *acl_fiber_server_conf(void)
+const char *acl_fiber_server_conf()
 {
 	return __conf_file;
 }
@@ -282,7 +282,7 @@ static void server_free(FIBER_SERVER *server);
 
 static int __exit_status = 0;
 
-static void main_server_onexit(void)
+static void main_server_onexit()
 {
 	if (__service_onexit) {
 		__service_onexit(__service_ctx);
@@ -313,7 +313,7 @@ static void main_server_exit(ACL_FIBER *fiber, int status)
 	__exit_status = status;
 }
 
-static void main_stop_listen(void)
+static void main_stop_listen()
 {
 	static int dummy;
 	int i;
@@ -328,7 +328,7 @@ static void main_stop_listen(void)
 	}
 }
 
-static void main_stop_servers(void)
+static void main_stop_servers()
 {
 	static int dummy;
 	int i;
@@ -345,7 +345,7 @@ static void main_stop_servers(void)
 	}
 }
 
-static void main_free_servers(void)
+static void main_free_servers()
 {
 	int i;
 	for (i = 0; __servers[i] != NULL; i++) {
@@ -678,7 +678,7 @@ static void main_fiber_monitor_idle(ACL_FIBER *fiber, void *ctx acl_unused)
 	main_server_exit(fiber, 0);
 }
 
-static void main_thread_loop(void)
+static void main_thread_loop()
 {
 #if !defined(_WIN32) && !defined(_WIN64)
 	if (__daemon_mode) {
@@ -889,7 +889,7 @@ static void servers_start(FIBER_SERVER **servers, int nthreads)
 	main_thread_loop();
 }
 
-static void open_service_log(void)
+static void open_service_log()
 {
 #if !defined(_WIN32) && !defined(_WIN64)
 	/* first, close the master's log */
@@ -1001,7 +1001,7 @@ static va_list __ap_dest;
 static ACL_MASTER_SERVER_INIT_FN pre_jail = NULL;
 static ACL_MASTER_SERVER_INIT_FN post_init = NULL;
 
-static void parse_args(void)
+static void parse_args()
 {
 	const char *myname = "parse_args";
 	int name = __first_name;
@@ -1071,11 +1071,11 @@ static void fiber_log_writer(void *, const char *fmt, va_list ap)
 
 	acl::string buf;
 	buf.vformat(fmt, tmp);
-	//acl_msg_info("%s", buf.c_str());
-	printf("%s\r\n", buf.c_str());
+	acl_msg_info("%s", buf.c_str());
+	//printf("%s\r\n", buf.c_str());
 }
 
-static void hook_fiber_log(void)
+static void hook_fiber_log()
 {
 #if !defined(_WIN32) && !defined(_WIN64)
 	ACL_ARRAY *loggers = acl_log_get_streams();
@@ -1314,7 +1314,10 @@ void acl_fiber_server_main(int argc, char *argv[],
 	acl_msg_info("schedule event type - %s", acl_var_fiber_schedule_event);
 
 	if (acl_var_fiber_hook_log) {
-		hook_fiber_log();
+		// No support io_uring mode current!.
+		if (__fiber_schedule_event != FIBER_EVENT_IO_URING) {
+			hook_fiber_log();
+		}
 	}
 
 #if !defined(_WIN32) && !defined(_WIN64)

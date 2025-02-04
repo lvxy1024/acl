@@ -682,6 +682,18 @@ public:
 	string& push_back(unsigned char ch, bool term = true);
 
 	/**
+	 * 返回字符串中尾部字符，如果字符串为空串，则返回值为 -1
+	 * @return {char} 返回尾部字符或-1
+	 */
+	char back() const;
+
+	/**
+	 * 弹出尾部字符
+	 * @return {bool} 如果字符串非空，则在弹出尾部字符后返回true，否则返回false
+	 */
+	bool pop_back();
+
+	/**
 	 * 在缓冲区尾部添加 \0 以便应用使用时的安全性, 添加的 \0 不增加长度
 	 * @return {string&} 当前字符串对象的引用
 	 */
@@ -962,6 +974,20 @@ public:
 	 *  串对象为空串,返回的结果不需要释放，其引用了当前对象的一个内部地址
 	 */
 	std::pair<string, string>& split_nameval(char sep = '=');
+
+	/**
+ 	 * 从字符串左边开始将包含给定分隔符在内的右边截断
+	 * @param delimiter {char} 分隔符
+	 * @return {char*} 分隔符以右的字符串，当为NULL时表明未找到指定分隔符
+	 */
+	std::pair<string, string>& split_at(char delimiter);
+
+	/**
+	 * 从字符串右边开始将包含给定分隔符在内的右边截断
+	 * @param delimiter {char} 分隔符
+	 * @return {char*} 分隔符以右的字符串，当为NULL时表明未找到指定分隔符
+	 */
+	std::pair<string, string>& split_at_right(char delimiter);
 
 	/**
 	 * 将字符串拷贝到当前对象的缓冲区中
@@ -1368,6 +1394,23 @@ bool operator == (const acl::string& l, const std::string& r);
 // acl::string s = "hello world!";
 // std::cout << s << std::endl;
 std::ostream& operator << (std::ostream& o, const acl::string& s);
+
+/**
+ * 将字符串进行分割
+ * @param str {const char*} 待分割的源字符串
+ * @param sep {const char*} 分割的字符串，属于该字符串中的任一个字符都可做为分割符
+ * @param out {std::vector<std::string>&} 存储分割后的字符串结果集
+ */
+void split(const char* str, const char* sep, std::vector<std::string>& out);
+
+/**
+ * 将字符串进行分割
+ * @param str {const char*} 待分割的源字符串
+ * @param sep {const char*} 分割的字符串，属于该字符串中的任一个字符都可做为分割符
+ * @param out {std::list<std::string>&} 存储分割后的字符串结果集
+ * @return {size_t} 返回分割后结果集中字符串的个数
+ */
+size_t split(const char* str, const char* sep, std::list<std::string>& out);
 
 } // namespce acl
 

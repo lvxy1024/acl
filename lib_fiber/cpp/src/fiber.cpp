@@ -4,6 +4,20 @@
 
 namespace acl {
 
+class gui_backend : public fiber {
+public:
+	gui_backend() {}
+	~gui_backend() {}
+
+protected:
+	// @override
+	void run() {
+		while (true) {
+			fiber::delay(1000);         
+		}
+	}
+};
+
 fiber::fiber()
 {
 	f_ = NULL;
@@ -54,12 +68,12 @@ int fiber::get_errno() const
 
 bool fiber::is_ready() const
 {
-	return f_ ? acl_fiber_status(f_) == FIBER_STATUS_READY : false;
+	return f_ && acl_fiber_status(f_) == FIBER_STATUS_READY;
 }
 
 bool fiber::is_suspended() const
 {
-	return f_ ? acl_fiber_status(f_) == FIBER_STATUS_SUSPEND : false;
+	return f_ && acl_fiber_status(f_) == FIBER_STATUS_SUSPEND;
 }
 
 void fiber::set_errno(int errnum)
@@ -184,6 +198,15 @@ bool fiber::winapi_hook() {
 	return ::winapi_hook();
 }
 
+void fiber::share_epoll(bool yes)
+{
+#ifdef __linux__
+	acl_fiber_share_epoll(yes ? 1 : 0);
+#else
+	(void) yes;
+#endif
+}
+
 void fiber::run()
 {
 	acl_msg_fatal("%s(%d), %s: base function be called",
@@ -242,7 +265,7 @@ bool fiber::self_killed()
 	if (curr == NULL) {
 		return false;
 	}
-	return acl_fiber_killed(curr) ? true : false;
+	return acl_fiber_killed(curr) != 0;
 }
 
 void fiber::init(fiber_event_t type, bool schedule_auto /* = false */)
@@ -270,6 +293,22 @@ void fiber::init(fiber_event_t type, bool schedule_auto /* = false */)
 
 	acl_fiber_schedule_init(schedule_auto ? 1 : 0);
 	acl_fiber_schedule_set_event(etype);
+}
+
+static __thread acl::fiber *backend_fiber = NULL;
+
+void fiber::schedule_gui()
+{
+	acl_fiber_schedule_init(1);
+	acl_fiber_schedule_set_event(FIBER_EVENT_WMSG);
+	winapi_hook();
+
+	if (backend_fiber == NULL) {
+		backend_fiber = new gui_backend;
+		backend_fiber->start();
+		delete backend_fiber;
+		backend_fiber = NULL;
+	}
 }
 
 void fiber::schedule(fiber_event_t type /* FIBER_EVENT_T_KERNEL */)
@@ -382,6 +421,7 @@ void fiber::stackshow(const fiber& fb, size_t max /* = 50 */)
 //////////////////////////////////////////////////////////////////////////////
 
 fiber_timer::fiber_timer()
+: f_(NULL)
 {
 }
 
