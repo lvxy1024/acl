@@ -976,9 +976,12 @@ public:
 	std::pair<string, string>& split_nameval(char sep = '=');
 
 	/**
- 	 * 从字符串左边开始将包含给定分隔符在内的右边截断
+ 	 * 从字符串左边开始将包含给定分隔符在内的右边截断，该方法与split_nameval的不同
+ 	 * 之处是，本方法不会先清理所给字符串两边的空格/TAB字符，并且本方法也不会将开头
+ 	 * 的分隔符去掉
 	 * @param delimiter {char} 分隔符
-	 * @return {char*} 分隔符以右的字符串，当为NULL时表明未找到指定分隔符
+	 * @return {std::pair<string, string>&} 返回name, value对，当未打到分隔符
+	 *  时，返回的 std::pair 里的均为空串
 	 */
 	std::pair<string, string>& split_at(char delimiter);
 
@@ -1131,7 +1134,7 @@ public:
 	 *  needle 字符串
 	 * @return {string&} 当前对象的引用
 	 *  如 acl::string s("hello world!");
-	 *  若 s.strip("hel", true), 则结果为： s == "o word!"
+	 *  若 s.etrip("hel", true), 则结果为： s == "o word!"
 	 *  若 s.strip("hel", false), 则结果为: s = "lo world!"
 	 */
 	string& strip(const char* needle, bool each = false);
