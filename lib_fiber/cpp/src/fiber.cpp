@@ -45,6 +45,11 @@ fiber::~fiber()
 {
 }
 
+void fiber::reset()
+{
+	f_ = NULL;
+}
+
 unsigned int fiber::get_id() const
 {
 	return f_ ? acl_fiber_id(f_) : 0;
@@ -156,6 +161,16 @@ size_t fiber::get_shared_stack_size()
 	return acl_fiber_get_shared_stack_size();
 }
 
+void fiber::set_max_cache(int max)
+{
+	acl_fiber_set_max_cache(max);
+}
+
+int fiber::get_max_cache()
+{
+	return acl_fiber_get_max_cache();
+}
+
 ACL_FIBER *fiber::get_fiber() const
 {
 	return f_;
@@ -233,6 +248,9 @@ void fiber::fiber_callback(ACL_FIBER *f, void *ctx)
 	fiber* me = (fiber *) ctx;
 	me->f_ = f;
 	me->run();
+
+	// xxxx: don't set NULL here, or crash will happend. --- zsx, 2025.4.18.
+	// me->f_ = NULL;
 }
 
 bool fiber::kill(bool sync)

@@ -59,6 +59,12 @@ public:
 	void start(size_t stack_size = 320000, bool share_stack = false);
 
 	/**
+	 * Set the fiber's handle f_ to NULL after the fiber finished;
+	 * the method can only be called after the fiber finished.
+	 */
+	void reset();
+
+	/**
 	 * Calling the method to stop the currenct running coroutine.
 	 * @param sync {bool} Whether to use synchronous mode, that is, whether
 	 *  to wait for the killed coroutine to resturn.
@@ -269,6 +275,9 @@ public:
 	 *  mode is not enabled.
 	 */
 	static size_t get_shared_stack_size();
+
+	static void set_max_cache(int max);
+	static int get_max_cache();
 
 	static void acl_io_hook();
 
