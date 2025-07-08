@@ -1,4 +1,4 @@
-%define release_id 1
+%define release_id 4
 
 Summary: acl master framework
 Name:           acl-master
@@ -87,6 +87,15 @@ fi
 %endif
 
 %changelog
+* Thu Jun 12 2025 shuxin.zheng@qq.com 3.5.5-4-20250612.22
+- acl_master: set ulimit -n from 204800 to 500000.
+
+* Thu Jun 12 2025 shuxin.zheng@qq.com 3.5.5-3-20250612.21
+- acl_master: set ulimit -n from 204800 to 500000.
+
+* Mon Jun 09 2025 shuxin.zheng@qq.com 3.5.5-2-20250609.17
+- feature: acl_master can set the children's envrion in the standard format.
+
 * Mon Apr 17 2023 shuxin.zheng@qq.com 3.5.5-1-20230417.11
 - bugfix: dead lock maybe happends when writing log after fork().
 
