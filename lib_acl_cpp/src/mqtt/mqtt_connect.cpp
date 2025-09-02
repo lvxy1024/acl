@@ -82,6 +82,7 @@ void mqtt_connect::set_will_qos(mqtt_qos_t qos) {
 		break;
 	default:
 		logger_error("invalid qos: %d", (int) qos);
+		break;
 	}
 }
 
@@ -101,7 +102,7 @@ void mqtt_connect::clean_session() {
 	conn_flags_ |= 0x02;
 }
 
-bool mqtt_connect::has_session() const {
+bool mqtt_connect::session_cleaned() const {
 	return conn_flags_ & 0x02 ? true : false;
 }
 
