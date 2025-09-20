@@ -64,7 +64,7 @@ static void argv_push_front(ACL_ARGV *argvp, const char *s) {
 
 static char *argv_pop_back(ACL_ARGV *argvp) {
 	if (argvp->argc <= 0) {
-		return (NULL);
+		return NULL;
 	}
 	return argvp->argv[--argvp->argc];
 }
@@ -74,7 +74,7 @@ static char *argv_pop_front(ACL_ARGV *argvp) {
 	int   i;
 
 	if (argvp->argc <= 0) {
-		return (NULL);
+		return NULL;
 	}
 	s = argvp->argv[0];
 	argvp->argc--;
@@ -87,25 +87,27 @@ static char *argv_pop_front(ACL_ARGV *argvp) {
 
 /* argv_iter_head - get the head of the array */
 
-static void *argv_iter_head(ACL_ITER *iter, const ACL_ARGV *argv) {
+void *acl_argv_iter_head(ACL_ITER *iter, const ACL_ARGV *argv) {
 	iter->dlen = -1;
-	iter->key = NULL;
+	iter->key  = NULL;
 	iter->klen = -1;
 
 	iter->i = 0;
 	iter->size = argv->argc;
-	iter->ptr = argv->argv[0];
-
-	iter->data = iter->ptr;
+	if (iter->size <= 0) {
+		iter->data = iter->ptr = NULL;
+	} else {
+		iter->data = iter->ptr = argv->argv[0];
+	}
 	return iter->ptr;
 }
 
 /* argv_iter_next - get the next of the array */
 
-static void *argv_iter_next(ACL_ITER *iter, const ACL_ARGV *argv) {
+void *acl_argv_iter_next(ACL_ITER *iter, const ACL_ARGV *argv) {
 	iter->i++;
 	if (iter->i >= argv->argc) {
-		iter->data = iter->ptr = 0;
+		iter->data = iter->ptr = NULL;
 	} else {
 		iter->data = iter->ptr = argv->argv[iter->i];
 	}
@@ -114,15 +116,15 @@ static void *argv_iter_next(ACL_ITER *iter, const ACL_ARGV *argv) {
  
 /* argv_iter_tail - get the tail of the array */
 
-static void *argv_iter_tail(ACL_ITER *iter, const ACL_ARGV *argv) {
+void *acl_argv_iter_tail(ACL_ITER *iter, const ACL_ARGV *argv) {
 	iter->dlen = -1;
-	iter->key = NULL;
+	iter->key  = NULL;
 	iter->klen = -1;
 
 	iter->i = argv->argc - 1;
 	iter->size = argv->argc;
 	if (iter->i < 0) {
-		iter->data = iter->ptr = 0;
+		iter->data = iter->ptr = NULL;
 	} else {
 		iter->data = iter->ptr = argv->argv[iter->i];
 	}
@@ -131,10 +133,10 @@ static void *argv_iter_tail(ACL_ITER *iter, const ACL_ARGV *argv) {
 
 /* argv_iter_prev - get the prev of the array */
 
-static void *argv_iter_prev(ACL_ITER *iter, const ACL_ARGV *argv) {
+void *acl_argv_iter_prev(ACL_ITER *iter, const ACL_ARGV *argv) {
 	iter->i--;
 	if (iter->i < 0) {
-		iter->data = iter->ptr = 0;
+		iter->data = iter->ptr = NULL;
 	} else {
 		iter->data = iter->ptr = argv->argv[iter->i];
 	}
@@ -194,30 +196,30 @@ ACL_ARGV *acl_argv_alloc2(int len, ACL_DBUF_POOL *dbuf) {
 		argvp->argv = (char **)
 			acl_mymalloc((sane_len + 1) * sizeof(char *));
 	}
-	argvp->len = sane_len;
-	argvp->argc = 0;
+	argvp->len     = sane_len;
+	argvp->argc    = 0;
 	argvp->argv[0] = 0;
 
-	argvp->push_back = argv_push_back;
+	argvp->push_back  = argv_push_back;
 	argvp->push_front = argv_push_front;
-	argvp->pop_back = argv_pop_back;
-	argvp->pop_front = argv_pop_front;
+	argvp->pop_back   = argv_pop_back;
+	argvp->pop_front  = argv_pop_front;
 
 	/* set the iterator callback */
-	argvp->iter_head = argv_iter_head;
-	argvp->iter_next = argv_iter_next;
-	argvp->iter_tail = argv_iter_tail;
-	argvp->iter_prev = argv_iter_prev;
+	argvp->iter_head = acl_argv_iter_head;
+	argvp->iter_next = acl_argv_iter_next;
+	argvp->iter_tail = acl_argv_iter_tail;
+	argvp->iter_prev = acl_argv_iter_prev;
 
 	return argvp;
 }
 
 void acl_argv_iter_init(ACL_ARGV *argvp) {
 	/* set the iterator callback */
-	argvp->iter_head = argv_iter_head;
-	argvp->iter_next = argv_iter_next;
-	argvp->iter_tail = argv_iter_tail;
-	argvp->iter_prev = argv_iter_prev;
+	argvp->iter_head = acl_argv_iter_head;
+	argvp->iter_next = acl_argv_iter_next;
+	argvp->iter_tail = acl_argv_iter_tail;
+	argvp->iter_prev = acl_argv_iter_prev;
 }
 
 /* acl_argv_add - add string to vector */
@@ -336,12 +338,12 @@ int acl_argv_set(const ACL_ARGV *argvp, int idx, const char *value) {
 
 void acl_argv_terminate(const ACL_ARGV *argvp) {
 	/* Trust that argvp->argc < argvp->len. */
-	argvp->argv[argvp->argc] = 0;
+	argvp->argv[argvp->argc] = NULL;
 }
 
 char *acl_argv_index(const ACL_ARGV *argvp, int idx) {
 	if (argvp == NULL || idx < 0 || idx > argvp->argc - 1) {
-		return(NULL);
+		return NULL;
 	}
 
 	return argvp->argv[idx];
